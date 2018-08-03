@@ -29,6 +29,12 @@ namespace motors_elmo_ds402 {
          *
          * This is necessary to use torque commands and status
          */
+        void setEncoderScaleFactor(double factor);
+
+        /** Give the motor rated torque
+         *
+         * This is necessary to use torque commands and status
+         */
         void setRatedTorque(double torque);
 
         /** Returns the motor rated torque
@@ -57,6 +63,18 @@ namespace motors_elmo_ds402 {
          * Return the last received status word
          */
         StatusWord getStatusWord() const;
+
+        /** Message to query the current operation mode */
+        canbus::Message queryOperationMode() const;
+
+        /** Return the last received operation mode */
+        OPERATION_MODES getOperationMode() const;
+
+        /** Return the last received operation mode */
+        canbus::Message setOperationMode(OPERATION_MODES mode) const;
+
+        /** Set the torque target value */
+        canbus::Message setTorqueTarget(double torque);
 
         /** Return the set of SDO upload queries that allow
          * to update the factor objects
@@ -146,10 +164,21 @@ namespace motors_elmo_ds402 {
         /** Load configuration from non-volatile memory */
         canbus::Message queryLoad();
 
+        /** Set the zero position in raw encoder readings */
+        void setZeroPosition(int64_t position);
+
+        /** Gets the current zero position in raw encoder readings */
+        int64_t getZeroPosition() const;
+
+        /** Gets the current position in raw encoder readings */
+        int64_t getRawPosition() const;
+
     private:
         StateMachine mCanOpen;
         double mRatedTorque;
         Factors mFactors;
+
+        int64_t mZeroPosition = 0;
 
         Factors computeFactors() const;
 

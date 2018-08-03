@@ -17,37 +17,74 @@ int usage()
     cout << "  reset     # resets the drive";
     cout << "  get-state # displays the drive's internal state\n";
     cout << "  set-state NEW_STATE # changes the drive's internal state\n";
+    cout << "    SHUTDOWN, SWITCH_ON, ENABLE_OPERATION, DISABLE_VOLTAGE, QUICK_STOP,\n";
+    cout << "    DISABLE_OPERATION, FAULT_RESET\n";
     cout << endl;
     return 1;
 }
 
-const char* stateToString(StatusWord::State state)
+template<typename T>
+struct STRINGS {
+    std::string name;
+    T value;
+};
+
+STRINGS<StatusWord::State> StateStrings[] = {
+    { "NOT_READY_TO_SWITCH_ON", StatusWord::NOT_READY_TO_SWITCH_ON },
+    { "SWITCH_ON_DISABLED", StatusWord::SWITCH_ON_DISABLED },
+    { "READY_TO_SWITCH_ON", StatusWord::READY_TO_SWITCH_ON },
+    { "SWITCH_ON", StatusWord::SWITCH_ON },
+    { "OPERATION_ENABLED", StatusWord::OPERATION_ENABLED },
+    { "QUICK_STOP_ACTIVE", StatusWord::QUICK_STOP_ACTIVE },
+    { "FAULT_REACTION_ACTIVE", StatusWord::FAULT_REACTION_ACTIVE },
+    { "FAULT", StatusWord::FAULT },
+    { "", StatusWord::FAULT }
+};
+
+STRINGS<ControlWord::Transition> TransitionStrings[] = {
+    { "SHUTDOWN", ControlWord::SHUTDOWN },
+    { "SWITCH_ON", ControlWord::SWITCH_ON },
+    { "ENABLE_OPERATION", ControlWord::ENABLE_OPERATION },
+    { "DISABLE_VOLTAGE", ControlWord::DISABLE_VOLTAGE },
+    { "QUICK_STOP", ControlWord::QUICK_STOP },
+    { "DISABLE_OPERATION", ControlWord::DISABLE_OPERATION },
+    { "FAULT_RESET", ControlWord::FAULT_RESET },
+    { "", ControlWord::FAULT_RESET }
+};
+
+STRINGS<OPERATION_MODES> OperationModeStrings[] = {
+    { "NONE", OPERATION_MODE_NONE },
+    { "PROFILED_POSITION", OPERATION_MODE_PROFILED_POSITION },
+    { "VELOCITY", OPERATION_MODE_VELOCITY },
+    { "PROFILED_VELOCITY", OPERATION_MODE_PROFILED_VELOCITY },
+    { "PROFILED_TORQUE", OPERATION_MODE_PROFILED_TORQUE },
+    { "HOMING", OPERATION_MODE_HOMING },
+    { "CYCLIC_SYNCHRONOUS_POSITION", OPERATION_MODE_CYCLIC_SYNCHRONOUS_POSITION },
+    { "CYCLIC_SYNCHRONOUS_VELOCITY", OPERATION_MODE_CYCLIC_SYNCHRONOUS_VELOCITY },
+    { "CYCLIC_SYNCHRONOUS_TORQUE", OPERATION_MODE_CYCLIC_SYNCHRONOUS_TORQUE },
+    { "", OPERATION_MODE_PROFILED_POSITION }
+};
+
+template<typename T>
+std::string toString(T const* conversions, decltype(T::value) value)
 {
-    switch(state)
-    {
-        case StatusWord::NOT_READY_TO_SWITCH_ON: return "NOT_READY_TO_SWITCH_ON";
-        case StatusWord::SWITCH_ON_DISABLED: return "SWITCH_ON_DISABLED";
-        case StatusWord::READY_TO_SWITCH_ON: return "READY_TO_SWITCH_ON";
-        case StatusWord::SWITCH_ON: return "SWITCH_ON";
-        case StatusWord::OPERATION_ENABLED: return "OPERATION_ENABLED";
-        case StatusWord::QUICK_STOP_ACTIVE: return "QUICK_STOP_ACTIVE";
-        case StatusWord::FAULT_REACTION_ACTIVE: return "FAULT_REACTION_ACTIVE";
-        case StatusWord::FAULT: return "FAULT";
-        default:
-            throw std::invalid_argument("unknown state");
+    for (T const* conv = conversions; !conv->name.empty(); ++conv) {
+        if (conv->value == value) {
+            return conv->name;
+        }
     }
+    throw std::invalid_argument("unknown value");
 }
 
-ControlWord::Transition transitionFromString(std::string const& string)
+template<typename T>
+decltype(T::value) fromString(T const* conversions, std::string const& name)
 {
-    if (string == "SHUTDOWN") return ControlWord::SHUTDOWN;
-    if (string == "SWITCH_ON") return ControlWord::SWITCH_ON;
-    if (string == "ENABLE_OPERATION") return ControlWord::ENABLE_OPERATION;
-    if (string == "DISABLE_VOLTAGE") return ControlWord::DISABLE_VOLTAGE;
-    if (string == "QUICK_STOP") return ControlWord::QUICK_STOP;
-    if (string == "DISABLE_OPERATION") return ControlWord::DISABLE_OPERATION;
-    if (string == "FAULT_RESET") return ControlWord::FAULT_RESET;
-    throw std::invalid_argument("unexpected state transition " + string);
+    for (T const* conv = conversions; !conv->name.empty(); ++conv) {
+        if (conv->name == name) {
+            return conv->value;
+        }
+    }
+    throw std::invalid_argument("unknown string");
 }
 
 struct DisplayStats
@@ -93,14 +130,14 @@ static void writeObjects(canbus::Driver& device, vector<canbus::Message> const& 
 static void queryObject(canbus::Driver& device, canbus::Message const& query,
     motors_elmo_ds402::Controller& controller,
     uint64_t updateId,
-    base::Time timeout = base::Time::fromMilliseconds(100))
+    base::Time timeout = base::Time::fromMilliseconds(1000))
 {
     device.write(query);
     device.setReadTimeout(timeout.toMilliseconds());
     while(true)
     {
         canbus::Message msg = device.read();
-        if (controller.process(msg).isUpdated(updateId)) {
+        if (controller.process(msg).hasOneUpdated(updateId)) {
             return;
         }
     }
@@ -148,7 +185,16 @@ int main(int argc, char** argv)
     int8_t node_id(stoi(argv[3]));
     std::string cmd(argv[4]);
 
-    unique_ptr<canbus::Driver> device(canbus::openCanDevice(can_device, can_device_type));
+    unique_ptr<canbus::Driver> device;
+    try {
+        device.reset(canbus::openCanDevice(can_device, can_device_type));
+    }
+    catch(std::exception const& e) {
+        std::cerr << "Failed to open the CAN device: "
+            << e.what() << std::endl;
+        return 1;
+    }
+
     DisplayStats stats(dynamic_cast<iodrivers_base::Driver*>(device.get()));
     Controller controller(node_id);
 
@@ -188,11 +234,16 @@ int main(int argc, char** argv)
         queryObject(*device, controller.queryStatusWord(), controller,
             UPDATE_STATUS_WORD);
         StatusWord status = controller.getStatusWord();
-        cout << stateToString(status.state) << "\n"
+        cout << toString(StateStrings, status.state) << "\n"
             << "  voltageEnabled      " << status.voltageEnabled << "\n"
             << "  warning             " << status.warning << "\n"
             << "  targetReached       " << status.targetReached << "\n"
             << "  internalLimitActive " << status.internalLimitActive << std::endl;
+
+        queryObject(*device, controller.queryOperationMode(),
+            controller, UPDATE_OPERATION_MODE);
+        auto mode = controller.getOperationMode();
+        cout << "Operation Mode: " << toString(OperationModeStrings, mode) << "\n";
 
         queryObjects(*device, controller.queryFactors(),
             controller, UPDATE_FACTORS);
@@ -235,8 +286,83 @@ int main(int argc, char** argv)
         if (argc != 6)
             return usage();
 
-        auto transition = transitionFromString(argv[5]);
+        auto transition = fromString(TransitionStrings, argv[5]);
         writeObject(*device, controller.send(ControlWord(transition, true)), controller);
+        queryObject(*device, controller.queryStatusWord(), controller,
+            UPDATE_STATUS_WORD);
+        StatusWord status = controller.getStatusWord();
+        cout << "New state: " << toString(StateStrings, status.state) << endl;
+    }
+    else if (cmd == "stop")
+    {
+        writeObject(*device,
+            controller.setOperationMode(OPERATION_MODE_NONE),
+            controller);
+    }
+    else if (cmd == "set-torque")
+    {
+        if (argc != 6)
+            return usage();
+
+        queryObjects(*device, controller.queryFactors(),
+            controller, UPDATE_FACTORS);
+
+        device->write(controller.queryNodeStateTransition(
+            canopen_master::NODE_ENTER_PRE_OPERATIONAL));
+        writeObjects(*device, controller.queryPeriodicJointStateUpdate(0, 1),
+            controller);
+        device->write(controller.queryNodeStateTransition(
+            canopen_master::NODE_START));
+
+        double target_torque = atof(argv[5]);
+        writeObject(*device,
+            controller.setOperationMode(OPERATION_MODE_CYCLIC_SYNCHRONOUS_TORQUE),
+            controller);
+        writeObject(*device,
+            controller.send(ControlWord(ControlWord::SHUTDOWN, true)),
+            controller);
+        writeObject(*device,
+            controller.send(ControlWord(ControlWord::SWITCH_ON, true)),
+            controller);
+        writeObject(*device,
+            controller.send(ControlWord(ControlWord::ENABLE_OPERATION, true)),
+            controller);
+        canbus::Message sync = controller.querySync();
+        device->write(sync);
+        controller.setEncoderScaleFactor(1);
+        writeObject(*device,
+            controller.setTorqueTarget(0),
+            controller);
+        while(!interrupted)
+        {
+            writeObject(*device,
+                controller.setTorqueTarget(target_torque),
+                controller);
+            usleep(10000);
+            device->write(sync);
+
+            std::cout << base::Time::now().toMilliseconds() << " ";
+
+            Update state = Update();
+            while (!interrupted && !state.isUpdated(UPDATE_JOINT_STATE))
+            {
+                canbus::Message msg = device->read();
+                state.merge(controller.process(msg));
+            }
+
+            if (!interrupted) {
+                base::JointState jointState = controller.getJointState();
+                if (controller.getZeroPosition() == 0)
+                    controller.setZeroPosition(controller.getRawPosition());
+                cout << setw(10) << jointState.position << " "
+                    << setw(10) << jointState.speed << " "
+                    << setw(10) << jointState.effort << " "
+                    << setw(10) << jointState.raw << endl;
+            }
+        }
+        writeObject(*device,
+            controller.setOperationMode(OPERATION_MODE_NONE),
+            controller);
     }
     else if (cmd == "save")
     {

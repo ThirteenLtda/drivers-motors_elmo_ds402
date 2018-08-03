@@ -5,11 +5,9 @@ using namespace motors_elmo_ds402;
 
 double Factors::scaleEncoderValue(int64_t encoder) const
 {
-    int64_t turns = encoder * positionNumerator / positionDenominator;
-    int64_t remainingEncoder = encoder - turns * positionDenominator;
-    double remaining = static_cast<double>(remainingEncoder) * positionNumerator /
-        positionDenominator;
-    return 2 * M_PI * turns + 2 * M_PI * remaining;
+    double in_turns = static_cast<double>(encoder) *
+        positionNumerator / positionDenominator;
+    return in_turns;
 }
 
 double Factors::currentToUserTorque(long current) const
@@ -25,6 +23,7 @@ double Factors::currentToUser(long current) const
 void Factors::update()
 {
     positionNumerator =
+        encoderScaleFactor *
         feedLength *
         encoderRevolutions *
         gearDrivingShaftRevolutions;

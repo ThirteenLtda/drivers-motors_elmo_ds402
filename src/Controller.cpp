@@ -42,7 +42,25 @@ canopen_master::NODE_STATE Controller::getNodeState() const
 
 canbus::Message Controller::queryStatusWord() const
 {
-    return mCanOpen.upload(StatusWord::OBJECT_ID, 0);
+    return queryObject<StatusWord>();
+}
+
+canbus::Message Controller::queryOperationMode() const
+{
+    return queryObject<ModesOfOperation>();
+}
+
+OPERATION_MODES Controller::getOperationMode() const
+{
+    return static_cast<OPERATION_MODES>(getRaw<ModesOfOperation>());
+}
+
+canbus::Message Controller::setOperationMode(OPERATION_MODES mode) const
+{
+    return mCanOpen.download(
+        ModesOfOperation::OBJECT_ID,
+        ModesOfOperation::OBJECT_SUB_ID,
+        static_cast<int8_t>(mode));
 }
 
 std::vector<canbus::Message> Controller::queryFactors()
@@ -58,7 +76,21 @@ std::vector<canbus::Message> Controller::queryFactors()
         queryObject<VelocityFactorNum>(),
         queryObject<VelocityFactorDen>(),
         queryObject<MotorRatedCurrent>(),
+        queryObject<MotorRatedTorque>()
     };
+}
+
+canbus::Message Controller::setTorqueTarget(double target)
+{
+    if (base::isUnknown(mFactors.ratedTorque))
+        throw std::logic_error("must query or set rated torque before using setTorqueTarget");
+
+    double canopen_target = (target / mFactors.ratedTorque) * 1000;
+    if (canopen_target < -32767 || canopen_target > 32768)
+        throw std::out_of_range("torque value out of range");
+
+    return mCanOpen.download(TargetTorque::OBJECT_ID, TargetTorque::OBJECT_SUB_ID,
+        static_cast<int16_t>(canopen_target));
 }
 
 void Controller::setMotorParameters(MotorParameters const& parameters)
@@ -140,6 +172,7 @@ Update Controller::process(canbus::Message const& msg)
         switch(fullId)
         {
             SDO_UPDATE_CASE(StatusWord);
+            SDO_UPDATE_CASE(ModesOfOperation);
 
             // UPDATE_FACTORS
             SDO_UPDATE_CASE(PositionEncoderResolutionNum);
@@ -222,9 +255,30 @@ std::vector<canbus::Message> Controller::queryJointState() const
     };
 }
 
+int64_t Controller::getZeroPosition() const
+{
+    return mZeroPosition;
+}
+
+void Controller::setZeroPosition(int64_t base)
+{
+    mZeroPosition = base;
+}
+
+int64_t Controller::getRawPosition() const
+{
+    return getRaw<PositionActualInternalValue>();
+}
+
+void Controller::setEncoderScaleFactor(double scale)
+{
+    mFactors.encoderScaleFactor = scale;
+    mFactors.update();
+}
+
 base::JointState Controller::getJointState(uint64_t fields) const
 {
-    auto position = getRaw<PositionActualInternalValue>();
+    auto position = getRaw<PositionActualInternalValue>() - mZeroPosition;
     auto velocity = getRaw<VelocityActualValue>();
     // See comment in queryJointState
     auto current_and_torque = getRaw<CurrentActualValue>();

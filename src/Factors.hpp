@@ -16,6 +16,7 @@ namespace motors_elmo_ds402
         int64_t feedDrivingShaftRevolutions = 1;
         double ratedCurrent = base::unknown<double>();
         double ratedTorque  = base::unknown<double>();
+        double encoderScaleFactor = 2 * M_PI;
 
         void update();
         double scaleEncoderValue(int64_t encoder) const;

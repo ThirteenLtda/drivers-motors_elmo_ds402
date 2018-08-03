@@ -18,7 +18,21 @@ namespace motors_elmo_ds402
         UPDATE_JOINT_STATE    = UPDATE_JOINT_POSITION |
             UPDATE_JOINT_VELOCITY |
             UPDATE_JOINT_CURRENT,
-        UPDATE_JOINT_LIMITS   = 0x00000080
+        UPDATE_JOINT_LIMITS   = 0x00000080,
+        UPDATE_OPERATION_MODE = 0x00000100
+    };
+
+    enum OPERATION_MODES
+    {
+        OPERATION_MODE_NONE = 0,
+        OPERATION_MODE_PROFILED_POSITION = 1,
+        OPERATION_MODE_VELOCITY = 2,
+        OPERATION_MODE_PROFILED_VELOCITY = 3,
+        OPERATION_MODE_PROFILED_TORQUE = 4,
+        OPERATION_MODE_HOMING = 6,
+        OPERATION_MODE_CYCLIC_SYNCHRONOUS_POSITION = 8,
+        OPERATION_MODE_CYCLIC_SYNCHRONOUS_VELOCITY = 9,
+        OPERATION_MODE_CYCLIC_SYNCHRONOUS_TORQUE = 10
     };
 
     template<typename T, typename Raw> T parse(Raw value);
@@ -78,7 +92,7 @@ namespace motors_elmo_ds402
     CANOPEN_DEFINE_RW_OBJECT(0x605C, 0, DisableOperationOptionCode,    std::int16_t, 0);
     CANOPEN_DEFINE_RW_OBJECT(0x605D, 0, HaltOptionCode,                std::int16_t, 0);
     CANOPEN_DEFINE_RW_OBJECT(0x605E, 0, FaultReactionOptionCode,       std::int16_t, 0);
-    CANOPEN_DEFINE_RW_OBJECT(0x6060, 0, ModesOfOperation,              std::int8_t, 0);
+    CANOPEN_DEFINE_RW_OBJECT(0x6060, 0, ModesOfOperation,              std::int8_t, UPDATE_OPERATION_MODE);
     CANOPEN_DEFINE_RO_OBJECT(0x6062, 0, PositionDemandValue,           std::int32_t, 0);
     CANOPEN_DEFINE_RO_OBJECT(0x6063, 0, PositionActualInternalValue,   std::int32_t, UPDATE_JOINT_POSITION);
     CANOPEN_DEFINE_RW_OBJECT(0x6065, 0, FollowingErrorWindow,          std::uint32_t, 0);

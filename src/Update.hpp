@@ -49,7 +49,12 @@ namespace motors_elmo_ds402
             return isUpdated(T::UPDATE_ID);
         }
 
-        bool isUpdated(uint64_t updateId)
+        bool hasOneUpdated(int64_t updateId) const
+        {
+            return (mUpdatedObjects & updateId) != 0;
+        }
+
+        bool isUpdated(uint64_t updateId) const
         {
             return (mUpdatedObjects & updateId) == updateId;
         }
@@ -62,4 +67,3 @@ namespace motors_elmo_ds402
 }
 
 #endif
-

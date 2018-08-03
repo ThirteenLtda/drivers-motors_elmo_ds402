@@ -50,7 +50,7 @@ namespace motors_elmo_ds402
                 word = 0x07;
                 break;
             case ControlWord::FAULT_RESET:
-                word = 0x10;
+                word = 0x80;
                 break;
         }
 
