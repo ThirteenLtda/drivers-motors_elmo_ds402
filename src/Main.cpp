@@ -324,6 +324,8 @@ int main(int argc, char** argv)
         queryObjects(*device, controller.queryFactors(),
             controller, UPDATE_FACTORS);
 
+        Deinit deinit(*device, controller);
+
         device->write(controller.queryNodeStateTransition(
             canopen_master::NODE_ENTER_PRE_OPERATIONAL));
         writeObjects(*device, controller.queryPeriodicJointStateUpdate(0, 1),
