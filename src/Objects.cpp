@@ -61,14 +61,14 @@ namespace motors_elmo_ds402
     }
 
     template<>
-    StatusWord parse<StatusWord, uint16_t>(uint16_t word)
+    StatusWord parse<StatusWord, uint16_t>(uint16_t raw)
     {
-        StatusWord::State state = parseState(word & 0x6F);
-        bool voltageEnabled = (word & 0x0010);
-        bool warning        = (word & 0x0080);
-        bool targetReached  = (word & 0x0400);
-        bool internalLimitActive = (word & 0x0800);
-        return StatusWord { state, voltageEnabled, warning,
+        StatusWord::State state = parseState(raw & 0x6F);
+        bool voltageEnabled = (raw & 0x0010);
+        bool warning        = (raw & 0x0080);
+        bool targetReached  = (raw & 0x0400);
+        bool internalLimitActive = (raw & 0x0800);
+        return StatusWord { raw, state, voltageEnabled, warning,
             targetReached, internalLimitActive };
     }
 }

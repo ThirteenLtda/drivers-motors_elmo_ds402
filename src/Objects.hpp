@@ -206,14 +206,16 @@ namespace motors_elmo_ds402
             using std::runtime_error::runtime_error;
         };
 
+        uint16_t raw;
         State state;
         bool voltageEnabled;
         bool warning;
         bool targetReached;
         bool internalLimitActive;
 
-        StatusWord(State state, bool voltageEnabled, bool warning, bool targetReached, bool internalLimitActive)
-            : state(state)
+        StatusWord(uint16_t raw, State state, bool voltageEnabled, bool warning, bool targetReached, bool internalLimitActive)
+            : raw(raw)
+            , state(state)
             , voltageEnabled(voltageEnabled)
             , warning(warning)
             , targetReached(targetReached)
