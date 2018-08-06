@@ -134,18 +134,21 @@ namespace motors_elmo_ds402 {
         std::vector<canbus::Message> setJointLimits(base::JointLimitRange const& limits);
 
         /**
-         * Configure the controller to periodically send joint state information
+         * Configure the controller to send joint state information through PDOs
          */
-        std::vector<canbus::Message> queryPeriodicJointStateUpdate(
-            int pdoIndex, canopen_master::PDOCommunicationParameters, uint64_t fields);
+        std::vector<canbus::Message> configureJointStateUpdatePDOs(
+            int pdoIndex,
+            canopen_master::PDOCommunicationParameters parameters =
+                canopen_master::PDOCommunicationParameters::Sync(1),
+            uint64_t fields = UPDATE_JOINT_STATE);
 
-        /** @overload */
-        std::vector<canbus::Message> queryPeriodicJointStateUpdate(
-            int pdoIndex, base::Time const& period, uint64_t fields = UPDATE_JOINT_STATE);
-
-        /** @overload */
-        std::vector<canbus::Message> queryPeriodicJointStateUpdate(
-            int pdoIndex, int syncPeriod, uint64_t fields = UPDATE_JOINT_STATE);
+        /**
+         * Configure the controller to send status words through PDOs
+         */
+        std::vector<canbus::Message> configureStatusPDO(
+            int pdoIndex,
+            canopen_master::PDOCommunicationParameters parameters =
+                canopen_master::PDOCommunicationParameters::Async());
 
         template<typename T>
         canbus::Message send(T const& object)
@@ -172,6 +175,24 @@ namespace motors_elmo_ds402 {
 
         /** Gets the current position in raw encoder readings */
         int64_t getRawPosition() const;
+
+        /** Sets the setpoint in the corresponding objects in the dictionary
+         *
+         * They are not sent to the device. Use PDOs or updateTarget to
+         * write them on the device
+         */
+        void setControlTargets(base::JointState const& setpoint);
+
+        /** Returns the CAN messages necessary to configure a RPDO to update
+         * the drive's setpoint
+         */
+        std::vector<canbus::Message> configureControlPDO(
+            int pdoIndex,
+            base::JointState::MODE control_mode,
+            canopen_master::PDOCommunicationParameters parameters =
+                canopen_master::PDOCommunicationParameters::Async());
+
+        canbus::Message getRPDOMessage(unsigned int pdoIndex);
 
     private:
         StateMachine mCanOpen;

@@ -10,6 +10,7 @@
 
 using namespace std;
 using namespace motors_elmo_ds402;
+using namespace canopen_master;
 
 int usage()
 {
@@ -115,6 +116,10 @@ static void writeObject(canbus::Driver& device, canbus::Message const& query,
 {
 
     device.write(query);
+    std::cout << "SDO Write: ";
+    displayCANMessage(query);
+    std::cout << std::endl;
+
     device.setReadTimeout(timeout.toMilliseconds());
     while(true)
     {
@@ -170,6 +175,12 @@ void binOut(int16_t word)
     }
 }
 
+bool interrupted = false;
+void sigint(int)
+{
+    interrupted = true;
+}
+
 struct Deinit
 {
     canbus::Driver& mCan;
@@ -185,11 +196,6 @@ struct Deinit
     }
 };
 
-bool interrupted = false;
-void sigint(int)
-{
-    interrupted = true;
-}
 
 int main(int argc, char** argv)
 {
@@ -328,42 +334,53 @@ int main(int argc, char** argv)
 
         device->write(controller.queryNodeStateTransition(
             canopen_master::NODE_ENTER_PRE_OPERATIONAL));
-        writeObjects(*device, controller.queryPeriodicJointStateUpdate(0, 1),
+        writeObjects(*device,
+            controller.configureJointStateUpdatePDOs(0, PDOCommunicationParameters::Sync(1)),
+            controller);
+        writeObjects(*device,
+            controller.configureStatusPDO(2, PDOCommunicationParameters::Sync(1)),
+            controller);
+        writeObjects(*device, controller.configureControlPDO(0, base::JointState::EFFORT),
             controller);
         device->write(controller.queryNodeStateTransition(
             canopen_master::NODE_START));
 
         double target_torque = atof(argv[5]);
         writeObject(*device,
-            controller.setOperationMode(OPERATION_MODE_CYCLIC_SYNCHRONOUS_TORQUE),
-            controller);
-        writeObject(*device,
             controller.send(ControlWord(ControlWord::SHUTDOWN, true)),
             controller);
         writeObject(*device,
+            controller.setOperationMode(OPERATION_MODE_PROFILED_TORQUE),
+            controller);
+        usleep(1000);
+        writeObject(*device,
             controller.send(ControlWord(ControlWord::SWITCH_ON, true)),
             controller);
+        usleep(1000);
         writeObject(*device,
-            controller.send(ControlWord(ControlWord::ENABLE_OPERATION, true)),
+            controller.send(ControlWord(ControlWord::ENABLE_OPERATION, false)),
             controller);
+        usleep(1000);
+        controller.setEncoderScaleFactor(1);
+
         canbus::Message sync = controller.querySync();
         device->write(sync);
-        controller.setEncoderScaleFactor(1);
-        writeObject(*device,
-            controller.setTorqueTarget(0),
-            controller);
+        int cycle = 0;
         while(!interrupted)
         {
-            writeObject(*device,
-                controller.setTorqueTarget(target_torque),
-                controller);
-            usleep(10000);
+            if (cycle++ > 100)
+            {
+                target_torque = -target_torque;
+                cycle = 0;
+            }
+            usleep(2000);
+            controller.setControlTargets(base::JointState::Effort(target_torque));
+            device->write(controller.getRPDOMessage(0));
             device->write(sync);
-
-            std::cout << base::Time::now().toMilliseconds() << " ";
+            std::cout << dec << base::Time::now().toMilliseconds() << " ";
 
             Update state = Update();
-            while (!interrupted && !state.isUpdated(UPDATE_JOINT_STATE))
+            while (!interrupted && (!state.isUpdated(UPDATE_JOINT_STATE) || !state.isUpdated(UPDATE_STATUS_WORD)))
             {
                 canbus::Message msg = device->read();
                 state.merge(controller.process(msg));
@@ -373,7 +390,12 @@ int main(int argc, char** argv)
                 base::JointState jointState = controller.getJointState();
                 if (controller.getZeroPosition() == 0)
                     controller.setZeroPosition(controller.getRawPosition());
-                cout << setw(10) << jointState.position << " "
+
+                auto status = controller.getStatusWord();
+                binOut(status.raw);
+                cout << " " << status.state << " " << target_torque;
+
+                cout << " " << setw(10) << jointState.position << " "
                     << setw(10) << jointState.speed << " "
                     << setw(10) << jointState.effort << " "
                     << setw(10) << jointState.raw << endl;
@@ -381,6 +403,9 @@ int main(int argc, char** argv)
         }
         writeObject(*device,
             controller.setOperationMode(OPERATION_MODE_NONE),
+            controller);
+        writeObject(*device,
+            controller.send(ControlWord(ControlWord::SHUTDOWN, true)),
             controller);
     }
     else if (cmd == "save")
@@ -400,13 +425,13 @@ int main(int argc, char** argv)
         queryObjects(*device, controller.queryFactors(),
             controller, UPDATE_FACTORS);
         bool use_sync = true;
-        vector<canbus::Message> pdoSetup;
+        PDOCommunicationParameters pdoParameters;
         if (argc == 7) {
             if (string(argv[5]) == "--time") {
                 use_sync = false;
-                pdoSetup = controller.queryPeriodicJointStateUpdate(
-                    0, base::Time::fromMilliseconds(atoi(argv[6])));
-                }
+                auto period = base::Time::fromMilliseconds(atoi(argv[6]));
+                pdoParameters = PDOCommunicationParameters::Periodic(period);
+            }
             else {
                 std::cerr << "Invalid argument to 'monitor-joint-state'" << std::endl;
                 return usage();
@@ -416,8 +441,9 @@ int main(int argc, char** argv)
             return usage();
         }
         else {
-            pdoSetup = controller.queryPeriodicJointStateUpdate(0, 1);
+            pdoParameters = PDOCommunicationParameters::Sync(1);
         }
+        auto pdoSetup = controller.configureJointStateUpdatePDOs(0, pdoParameters);
         device->write(controller.queryNodeStateTransition(
             canopen_master::NODE_ENTER_PRE_OPERATIONAL));
         writeObjects(*device, pdoSetup, controller);

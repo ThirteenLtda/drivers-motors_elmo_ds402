@@ -3,21 +3,36 @@
 using namespace std;
 using namespace motors_elmo_ds402;
 
-double Factors::scaleEncoderValue(int64_t encoder) const
+double Factors::rawToEncoder(int64_t encoder) const
 {
-    double in_turns = static_cast<double>(encoder) *
+    return static_cast<double>(encoder) *
         positionNumerator / positionDenominator;
-    return in_turns;
 }
 
-double Factors::currentToUserTorque(long current) const
+int64_t Factors::rawFromEncoder(double encoder) const
 {
-    return static_cast<double>(current) / 1000 * ratedTorque;
+    return static_cast<double>(encoder) *
+        positionDenominator / positionNumerator;
 }
 
-double Factors::currentToUser(long current) const
+long Factors::rawFromCurrent(double current) const
 {
-    return static_cast<double>(current) / 1000 * ratedCurrent;
+    return static_cast<double>(current) / ratedCurrent * 1000;
+}
+
+long Factors::rawFromTorque(double torque) const
+{
+    return static_cast<double>(torque) / ratedTorque * 1000;
+}
+
+double Factors::rawToCurrent(long raw) const
+{
+    return static_cast<double>(raw) / 1000 * ratedCurrent;
+}
+
+double Factors::rawToTorque(long raw) const
+{
+    return static_cast<double>(raw) / 1000 * ratedTorque;
 }
 
 void Factors::update()

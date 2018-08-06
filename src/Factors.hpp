@@ -19,9 +19,13 @@ namespace motors_elmo_ds402
         double encoderScaleFactor = 2 * M_PI;
 
         void update();
-        double scaleEncoderValue(int64_t encoder) const;
-        double currentToUserTorque(int64_t current) const;
-        double currentToUser(int64_t current) const;
+
+        double  rawToEncoder(int64_t raw) const;
+        int64_t rawFromEncoder(double encoder) const;
+        double  rawToCurrent(int64_t raw) const;
+        double  rawToTorque(int64_t raw) const;
+        int64_t rawFromCurrent(double current) const;
+        int64_t rawFromTorque(double torque) const;
 
         int64_t positionNumerator = 1;
         int64_t positionDenominator = 1;

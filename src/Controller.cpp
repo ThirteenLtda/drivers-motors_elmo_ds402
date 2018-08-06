@@ -285,12 +285,12 @@ base::JointState Controller::getJointState(uint64_t fields) const
 
     base::JointState state;
     if (fields & UPDATE_JOINT_POSITION)
-        state.position = mFactors.scaleEncoderValue(position);
+        state.position = mFactors.rawToEncoder(position);
     if (fields & UPDATE_JOINT_VELOCITY)
-        state.speed    = mFactors.scaleEncoderValue(velocity);
+        state.speed    = mFactors.rawToEncoder(velocity);
     if (fields & UPDATE_JOINT_CURRENT) {
-        state.raw      = mFactors.currentToUser(current_and_torque);
-        state.effort   = mFactors.currentToUserTorque(current_and_torque);
+        state.raw      = mFactors.rawToCurrent(current_and_torque);
+        state.effort   = mFactors.rawToTorque(current_and_torque);
     }
     return state;
 }
@@ -321,8 +321,8 @@ base::JointLimitRange Controller::getJointLimits() const
     }
     else
     {
-        min.position = mFactors.scaleEncoderValue(rawPositionMin);
-        max.position = mFactors.scaleEncoderValue(rawPositionMax);
+        min.position = mFactors.rawToEncoder(rawPositionMin);
+        max.position = mFactors.rawToEncoder(rawPositionMax);
     }
 
     int32_t rawMaxSpeed = getRaw<MaxMotorSpeed>();
@@ -333,7 +333,7 @@ base::JointLimitRange Controller::getJointLimits() const
     }
     else
     {
-        double speedLimit = mFactors.scaleEncoderValue(rawMaxSpeed);
+        double speedLimit = mFactors.rawToEncoder(rawMaxSpeed);
         min.speed = -speedLimit;
         max.speed = speedLimit;
     }
@@ -342,11 +342,11 @@ base::JointLimitRange Controller::getJointLimits() const
     max.acceleration = base::infinity<double>();
 
     auto torqueAndCurrentLimit = getRaw<MaxCurrent>();
-    double torqueLimit = mFactors.currentToUserTorque(torqueAndCurrentLimit);
+    double torqueLimit = mFactors.rawToTorque(torqueAndCurrentLimit);
     min.effort = -torqueLimit;
     max.effort = torqueLimit;
 
-    double currentLimit = mFactors.currentToUser(torqueAndCurrentLimit);
+    double currentLimit = mFactors.rawToCurrent(torqueAndCurrentLimit);
     min.raw = -currentLimit;
     max.raw = currentLimit;
 
@@ -366,25 +366,65 @@ struct PDOMapping : canopen_master::PDOMapping
     }
 };
 
-vector<canbus::Message> Controller::queryPeriodicJointStateUpdate(
-    int pdoIndex, base::Time const& period, uint64_t fields)
+void Controller::setControlTargets(base::JointState const& targets)
 {
-    canopen_master::PDOCommunicationParameters parameters;
-    parameters.transmission_mode = canopen_master::PDO_ASYNCHRONOUS;
-    parameters.timer_period = period;
-    return queryPeriodicJointStateUpdate(pdoIndex, parameters, fields);
+    if (targets.hasPosition())
+    {
+        int64_t raw = mFactors.rawFromEncoder(targets.position);
+        setRaw<TargetPosition>(raw);
+    }
+    if (targets.hasSpeed())
+    {
+        int64_t raw = mFactors.rawFromEncoder(targets.speed);
+        setRaw<TargetVelocity>(raw);
+    }
+    if (targets.hasEffort())
+    {
+        int64_t raw = mFactors.rawFromTorque(targets.effort);
+        setRaw<TargetTorque>(raw);
+    }
 }
 
-vector<canbus::Message> Controller::queryPeriodicJointStateUpdate(
-    int pdoIndex, int syncPeriod, uint64_t fields)
+canbus::Message Controller::getRPDOMessage(unsigned int pdoIndex)
 {
-    canopen_master::PDOCommunicationParameters parameters;
-    parameters.transmission_mode = canopen_master::PDO_SYNCHRONOUS;
-    parameters.sync_period = syncPeriod;
-    return queryPeriodicJointStateUpdate(pdoIndex, parameters, fields);
+    return mCanOpen.getRPDOMessage(pdoIndex);
 }
 
-vector<canbus::Message> Controller::queryPeriodicJointStateUpdate(
+std::vector<canbus::Message> Controller::configureControlPDO(
+    int pdoIndex, base::JointState::MODE control_mode,
+    canopen_master::PDOCommunicationParameters parameters)
+{
+    PDOMapping mapping;
+    switch(control_mode) {
+        case base::JointState::POSITION:
+            mapping.add<TargetPosition>();
+            break;
+        case base::JointState::SPEED:
+            mapping.add<TargetVelocity>();
+            break;
+        case base::JointState::EFFORT:
+            mapping.add<TargetTorque>();
+            break;
+        default:
+            throw std::invalid_argument("expected control_mode to be POSITION, SPEED or EFFORT");
+    }
+
+    auto msg = mCanOpen.configurePDO(false, pdoIndex, parameters, mapping);
+    mCanOpen.declareRPDOMapping(pdoIndex, mapping);
+    return msg;
+}
+
+std::vector<canbus::Message> Controller::configureStatusPDO(
+    int pdoIndex, canopen_master::PDOCommunicationParameters parameters)
+{
+    PDOMapping mapping;
+    mapping.add<StatusWord>();
+    auto msg = mCanOpen.configurePDO(true, pdoIndex, parameters, mapping);
+    mCanOpen.declareTPDOMapping(pdoIndex, mapping);
+    return msg;
+}
+
+vector<canbus::Message> Controller::configureJointStateUpdatePDOs(
     int pdoIndex, canopen_master::PDOCommunicationParameters parameters, uint64_t fields)
 {
     // We need two PDOs only if the three fields are reported. If not, need only
@@ -408,12 +448,12 @@ vector<canbus::Message> Controller::queryPeriodicJointStateUpdate(
     vector<canbus::Message> messages;
     if (!mapping0.empty()) {
         auto pdo = mCanOpen.configurePDO(true, pdoIndex, parameters, mapping0);
-        mCanOpen.declarePDOMapping(pdoIndex, mapping0);
+        mCanOpen.declareTPDOMapping(pdoIndex, mapping0);
         messages.insert(messages.end(), pdo.begin(), pdo.end());
     }
     if (!mapping1.empty()) {
         auto pdo = mCanOpen.configurePDO(true, pdoIndex + 1, parameters, mapping1);
-        mCanOpen.declarePDOMapping(pdoIndex + 1, mapping1);
+        mCanOpen.declareTPDOMapping(pdoIndex + 1, mapping1);
         messages.insert(messages.end(), pdo.begin(), pdo.end());
     }
     return messages;
