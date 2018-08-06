@@ -102,6 +102,13 @@ struct DisplayStats
     }
 };
 
+static void displayCANMessage(canbus::Message const& msg)
+{
+    std::cout << "can_id=" << hex << msg.can_id << " size=" << (int)msg.size;
+    for (int i = 0; i < msg.size; ++i)
+        std::cout << " " << std::hex << (int)msg.data[i];
+}
+
 static void writeObject(canbus::Driver& device, canbus::Message const& query,
     motors_elmo_ds402::Controller& controller,
     base::Time timeout = base::Time::fromMilliseconds(100))
@@ -150,6 +157,16 @@ static void queryObjects(canbus::Driver& device, std::vector<canbus::Message> co
 {
     for(auto const& msg : query) {
         queryObject(device, msg, controller, updateId, timeout);
+    }
+}
+
+void binOut(int16_t word)
+{
+    for (int i = 15; i >= 0; --i)
+    {
+        std::cout << ((word & (1 << i)) ? '1' : '0');
+        if (i % 4 == 0 && i != 0)
+            std::cout << '_';
     }
 }
 
