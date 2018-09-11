@@ -20,6 +20,11 @@ int usage()
     cout << "  set-state NEW_STATE # changes the drive's internal state\n";
     cout << "    SHUTDOWN, SWITCH_ON, ENABLE_OPERATION, DISABLE_VOLTAGE, QUICK_STOP,\n";
     cout << "    DISABLE_OPERATION, FAULT_RESET\n";
+    cout << "  stop # stops the current movement\n";
+    cout << "  set-torque # sets a torque command\n";
+    cout << "  save # save the current configuration\n";
+    cout << "  load # resets configuration using the one in the drive\n";
+    cout << "  monitor-joint-state # periodically displays the joint state\n";
     cout << endl;
     return 1;
 }
