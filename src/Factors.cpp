@@ -5,13 +5,13 @@ using namespace motors_elmo_ds402;
 
 double Factors::rawToEncoder(int64_t encoder) const
 {
-    return static_cast<double>(encoder) *
+    return encoderScaleFactor * static_cast<double>(encoder) *
         positionNumerator / positionDenominator;
 }
 
 int64_t Factors::rawFromEncoder(double encoder) const
 {
-    return static_cast<double>(encoder) *
+    return encoder / encoderScaleFactor *
         positionDenominator / positionNumerator;
 }
 
@@ -38,7 +38,6 @@ double Factors::rawToTorque(long raw) const
 void Factors::update()
 {
     positionNumerator =
-        encoderScaleFactor *
         feedLength *
         encoderRevolutions *
         gearDrivingShaftRevolutions;
