@@ -201,6 +201,7 @@ namespace motors_elmo_ds402 {
 
         int64_t mZeroPosition = 0;
 
+        MotorParameters mMotorParameters;
         Factors computeFactors() const;
 
         template<typename T>

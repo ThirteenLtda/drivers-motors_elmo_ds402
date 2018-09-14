@@ -95,6 +95,8 @@ canbus::Message Controller::setTorqueTarget(double target)
 
 void Controller::setMotorParameters(MotorParameters const& parameters)
 {
+    mMotorParameters = parameters;
+
     if (parameters.encoderTicks)
         setRaw<PositionEncoderResolutionNum>(parameters.encoderTicks);
     if (parameters.encoderRevolutions)
@@ -206,10 +208,10 @@ Update Controller::process(canbus::Message const& msg)
     }
 
     if (update & UPDATE_FACTORS) {
-        try {
-            mFactors = computeFactors();
-        }
-        catch(canopen_master::ObjectNotRead) {}
+        // If the user explicitely wrote motor parameters, we apply them again
+        // The method re-computed the factors. There's no need to do it
+        // explicitely
+        setMotorParameters(mMotorParameters);
     }
 
     return Update::UpdatedObjects(update);
