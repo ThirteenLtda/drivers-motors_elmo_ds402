@@ -15,7 +15,7 @@ using namespace canopen_master;
 int usage()
 {
     cout << "motors_elmo_ds402_ctl CAN_DEVICE CAN_DEVICE_TYPE CAN_ID COMMAND\n";
-    cout << "  reset     # resets the drive";
+    cout << "  reset     # resets the drive\n";
     cout << "  get-state # displays the drive's internal state\n";
     cout << "  set-state NEW_STATE # changes the drive's internal state\n";
     cout << "    SHUTDOWN, SWITCH_ON, ENABLE_OPERATION, DISABLE_VOLTAGE, QUICK_STOP,\n";
