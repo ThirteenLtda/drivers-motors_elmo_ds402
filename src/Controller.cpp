@@ -280,17 +280,20 @@ void Controller::setEncoderScaleFactor(double scale)
 
 base::JointState Controller::getJointState(uint64_t fields) const
 {
-    auto position = getRaw<PositionActualInternalValue>() - mZeroPosition;
-    auto velocity = getRaw<VelocityActualValue>();
-    // See comment in queryJointState
-    auto current_and_torque = getRaw<CurrentActualValue>();
-
     base::JointState state;
     if (fields & UPDATE_JOINT_POSITION)
+    {
+        auto position = getRaw<PositionActualInternalValue>() - mZeroPosition;
         state.position = mFactors.rawToEncoder(position);
+    }
     if (fields & UPDATE_JOINT_VELOCITY)
+    {
+        auto velocity = getRaw<VelocityActualValue>();
         state.speed    = mFactors.rawToEncoder(velocity);
+    }
     if (fields & UPDATE_JOINT_CURRENT) {
+        // See comment in queryJointState
+        auto current_and_torque = getRaw<CurrentActualValue>();
         state.raw      = mFactors.rawToCurrent(current_and_torque);
         state.effort   = mFactors.rawToTorque(current_and_torque);
     }
