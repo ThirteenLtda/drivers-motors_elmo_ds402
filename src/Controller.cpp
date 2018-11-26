@@ -451,12 +451,18 @@ vector<canbus::Message> Controller::configureJointStateUpdatePDOs(
     }
 
     vector<canbus::Message> messages;
-    if (!mapping0.empty()) {
+    if (mapping0.empty()) {
+	messages.push_back(mCanOpen.disablePDO(true, pdoIndex));
+    }
+    else {
         auto pdo = mCanOpen.configurePDO(true, pdoIndex, parameters, mapping0);
         mCanOpen.declareTPDOMapping(pdoIndex, mapping0);
         messages.insert(messages.end(), pdo.begin(), pdo.end());
     }
-    if (!mapping1.empty()) {
+    if (mapping1.empty()) {
+	messages.push_back(mCanOpen.disablePDO(true, pdoIndex + 1));
+    }
+    else {
         auto pdo = mCanOpen.configurePDO(true, pdoIndex + 1, parameters, mapping1);
         mCanOpen.declareTPDOMapping(pdoIndex + 1, mapping1);
         messages.insert(messages.end(), pdo.begin(), pdo.end());
