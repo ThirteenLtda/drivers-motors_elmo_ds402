@@ -7,6 +7,14 @@ Controller::Controller(uint8_t nodeId)
     : mCanOpen(nodeId)
     , mRatedTorque(base::unknown<double>())
 {
+    setRaw<PositionEncoderResolutionNum>(1);
+    setRaw<PositionEncoderResolutionDen>(1);
+    setRaw<GearRatioNum>(1);
+    setRaw<GearRatioDen>(1);
+    setRaw<FeedConstantNum>(1);
+    setRaw<FeedConstantDen>(1);
+    setRaw<MotorRatedCurrent>(1);
+    setRaw<MotorRatedTorque>(1);
 }
 
 void Controller::setRatedTorque(double ratedTorque)
