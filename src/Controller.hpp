@@ -47,6 +47,12 @@ namespace motors_elmo_ds402 {
         /** Query the canopen node state */
         canbus::Message queryNodeState() const;
 
+        /** Query the Elmo-specific CAN controller status */
+        canbus::Message queryCANControllerStatus() const;
+
+        /** Get the CAN controller status */
+        CANControllerStatus getCANControllerStatus() const;
+
         /** Return the last known node state */
         canbus::Message queryNodeStateTransition(
             canopen_master::NODE_STATE_TRANSITION transition) const;
@@ -194,6 +200,25 @@ namespace motors_elmo_ds402 {
 
         canbus::Message getRPDOMessage(unsigned int pdoIndex);
 
+        /** Query the upload of an object */
+        template<typename T>
+        canbus::Message queryObject() const;
+
+        /** Get an object from the object database */
+        template<typename T> T get() const;
+
+        /** Check whether the given object has been initialized in the object database */
+        template<typename T> bool has() const
+        {
+            return mCanOpen.has(T::OBJECT_ID, T::OBJECT_SUB_ID);
+        }
+
+        /** Timestamp of the last written value for the given object (might be zero) */
+        template<typename T> base::Time timestamp() const
+        {
+            return mCanOpen.timestamp(T::OBJECT_ID, T::OBJECT_SUB_ID);
+        }
+
     private:
         StateMachine mCanOpen;
         double mRatedTorque;
@@ -204,9 +229,6 @@ namespace motors_elmo_ds402 {
         MotorParameters mMotorParameters;
         Factors computeFactors() const;
 
-        template<typename T>
-        canbus::Message queryObject() const;
-        template<typename T> T get() const;
         template<typename T> typename T::OBJECT_TYPE getRaw() const;
         template<typename T> void setRaw(typename T::OBJECT_TYPE value);
     };

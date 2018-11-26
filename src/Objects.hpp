@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <canopen_master/Frame.hpp>
 
 namespace motors_elmo_ds402
 {
@@ -76,7 +77,7 @@ namespace motors_elmo_ds402
     CANOPEN_DEFINE_RO_OBJECT(0x1018, 4, IdentityObject,                std::uint32_t, 0);
     CANOPEN_DEFINE_RO_OBJECT(0x2041, 0, TimestampUsec,                 std::uint32_t, 0);
     CANOPEN_DEFINE_RO_OBJECT(0x2081, 5, ExtendedErrorCode,             std::int32_t, 0);
-    CANOPEN_DEFINE_RO_OBJECT(0x2082, 0, CANControllerStatus,           std::uint32_t, 0);
+    CANOPEN_DEFINE_RO_OBJECT(0x2082, 0, CANControllerStatusRegister,   std::uint32_t, 0);
     CANOPEN_DEFINE_RO_OBJECT(0x2085, 0, ExtraStatusRegister,           std::int16_t, 0);
     CANOPEN_DEFINE_RO_OBJECT(0x2086, 0, STOStatusRegister,             std::uint32_t, 0);
     CANOPEN_DEFINE_RO_OBJECT(0x2087, 0, PALVersion,                    std::uint16_t, 0);
@@ -220,6 +221,13 @@ namespace motors_elmo_ds402
             , warning(warning)
             , targetReached(targetReached)
             , internalLimitActive(internalLimitActive) {}
+    };
+
+    struct CANControllerStatus : public CANControllerStatusRegister
+    {
+        canopen_master::NODE_STATE nodeState;
+        uint8_t txErrorCounter = 0;
+        uint8_t rxErrorCounter = 0;
     };
 }
 

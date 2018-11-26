@@ -29,6 +29,16 @@ canbus::Message Controller::queryNodeState() const
     return mCanOpen.queryState();
 }
 
+canbus::Message Controller::queryCANControllerStatus() const
+{
+    return queryObject<CANControllerStatus>();
+}
+
+CANControllerStatus Controller::getCANControllerStatus() const
+{
+    return get<CANControllerStatus>();
+}
+
 canbus::Message Controller::queryNodeStateTransition(
             canopen_master::NODE_STATE_TRANSITION transition) const
 {
