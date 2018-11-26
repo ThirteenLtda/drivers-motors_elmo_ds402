@@ -37,10 +37,16 @@ namespace motors_elmo_ds402
             return mAckedObjectID != 0;
         }
 
-        bool isAcked(uint16_t objectId, uint8_t objectSubID)
+        bool isAcked(uint16_t objectId, uint8_t objectSubID) const
         {
             return (mAckedObjectID == objectId) &&
                 (mAckedObjectSubID == objectSubID);
+        }
+
+        template<typename T>
+        bool isAcked() const
+        {
+            return this->isAcked(T::OBJECT_ID, T::OBJECT_SUB_ID);
         }
 
         template<typename T>

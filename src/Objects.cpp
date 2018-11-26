@@ -71,4 +71,19 @@ namespace motors_elmo_ds402
         return StatusWord { raw, state, voltageEnabled, warning,
             targetReached, internalLimitActive };
     }
+
+    template<>
+    CANControllerStatus parse<CANControllerStatus, uint32_t>(uint32_t raw)
+    {
+        uint8_t flags = static_cast<uint8_t>(raw & 0xFF);
+        uint8_t rx_counter = static_cast<uint8_t>((raw >> 8) & 0xFF);
+        uint8_t tx_counter = static_cast<uint8_t>((raw >> 16) & 0xFF);
+        auto state = static_cast<canopen_master::NODE_STATE>(raw >> 24);
+        CANControllerStatus ret;
+        ret.nodeState = state;
+        ret.txErrorCounter = tx_counter;
+        ret.rxErrorCounter = rx_counter;
+        ret.receiverFlags = flags;
+        return ret;
+    }
 }

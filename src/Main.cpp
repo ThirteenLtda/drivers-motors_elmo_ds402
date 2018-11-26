@@ -144,6 +144,24 @@ static void writeObjects(canbus::Driver& device, vector<canbus::Message> const& 
     }
 }
 
+template<typename Object>
+static Object querySingleObject(canbus::Driver& device,
+    motors_elmo_ds402::Controller& controller,
+    base::Time timeout = base::Time::fromMilliseconds(1000))
+{
+    device.write(controller.queryObject<Object>());
+    device.setReadTimeout(timeout.toMilliseconds());
+    base::Time current = controller.timestamp<Object>();
+    while(true)
+    {
+        canbus::Message msg = device.read();
+        controller.process(msg);
+        if (current != controller.timestamp<Object>()) {
+            return controller.get<Object>();
+        }
+    }
+}
+
 static void queryObject(canbus::Driver& device, canbus::Message const& query,
     motors_elmo_ds402::Controller& controller,
     uint64_t updateId,
@@ -267,6 +285,12 @@ int main(int argc, char** argv)
             << "  warning             " << status.warning << "\n"
             << "  targetReached       " << status.targetReached << "\n"
             << "  internalLimitActive " << status.internalLimitActive << std::endl;
+
+        auto can_status = querySingleObject<CANControllerStatus>(*device, controller);
+        cout << "CAN Status: " << can_status.nodeState << "\n"
+            << "  txErrorCounter: " << static_cast<int>(can_status.txErrorCounter) << "\n"
+            << "  rxErrorCounter: " << static_cast<int>(can_status.rxErrorCounter) << "\n"
+            << "  flags: " << static_cast<int>(can_status.receiverFlags) << std::endl;
 
         queryObject(*device, controller.queryOperationMode(),
             controller, UPDATE_OPERATION_MODE);
